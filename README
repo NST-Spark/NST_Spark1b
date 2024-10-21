@@ -1,2 +1,10 @@
+Preliminary Findings from an Augmented Reality (AR) App Delivering Recovery-Oriented Cognitive Therapy for Negative Symptoms in Schizophrenia 
+
+Sunny X. Tang, M.D., Moein Foroughi,M.D., Aaron P. Brinen, Psy.D., Michael L. Birnbaum, M.D., Sarah Berretta, B.A., Leily M. Behbehani, B.S., John M. Kane, M.D., Edward Yoon, William F. Cronin, M.B.A. 
+
 North Shore Therapeutics
-Spark_1b
+Spark_1b Trial
+
+This repository includes raw cleaned data ("NST-SPARK 1b Raw Cleaned Data.xlsx") and R scripts for compiling the data ("Script Compile.R") and the analyses included in our manuscript ("RMD Analyses V2.Rmd"). Note that open-ended responses were paraphrased and redacted to protext participant privacy.
+
+For inquiries, reach out to the corresponding author, Dr. Sunny Tang: sunny@northshore.health
