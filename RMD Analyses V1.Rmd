@@ -1,0 +1,217 @@
+---
+title: "SPARK 1b Analyses V1"
+author: "Sunny"
+date: "2024 10-12"
+output:
+     html_document:
+          toc: true
+theme: united
+---
+
+```{r setup, include=FALSE}
+
+######## LOAD PACKAGES ###########
+
+# Data Processing:
+library(psych) #psych stats package, includes factor analysis
+library(bestNormalize) #yeojohnson and other transformations
+library(mice) #multiple imputation
+#library(Matching) #propensity score matching
+#library(MatchIt) #simpler matching
+library(robustbase) #adjusted box plot
+library(performance) #check_outliers for mahalanobis distance, influence
+#library(NbClust) #Clustering - how many
+library(Rtsne) #t-SNE dimensionality reduction
+
+# General Stats:
+library(effsize) #cohen d, etc.
+library(lm.beta) #standardized beta
+library(DescTools) #Fisher r to z tranformation
+library(nlme) #mixed effects
+#library(irr) # interrater correlation
+library(RVAideMemoire) #Pairwise comparisons and other stats
+#library(lme4) #expands on nlme with generalized linear regressions
+#library(lavaan) #cFA, mediation analysis
+library(moments) #skewness and kurtosis
+
+# Graphing
+library(gridExtra) #arranges ggplot grobs
+library(Hmisc) #works with ggplot and others
+library(corrplot) # correlation plots
+library(ggpubr) #pairwise and statistics for ggplot
+#library(hexbin) #Binning and plotting functions for hexagonal bins - network
+#library(networkD3) #Creates D3 JavaScript network, tree, dendrogram graphs from R.
+#library(tidytext) #Text mining
+#library(plotly) #Interactive graphs
+#library(repr)#String and binary representations - Network
+library(RColorBrewer)
+library(ggthemes) #Preset themes for ggplot
+library(ggnewscale) #Can switch color scale
+library(patchwork) #Compile ggplots
+
+# Standard Packages (all projects)
+library(plyr) #data manipulations
+library(naniar) #na functions
+library(arsenal) #tableby
+library(tidyverse) #dplyr, ggplot, stringr, et al
+
+
+set.seed(123)
+knitr::opts_chunk$set(warning = FALSE, message = FALSE) 
+
+######## LOAD DATA ###########
+load("long.R")
+load("wide.R")
+
+
+```
+
+
+```{r prep stuff, include=FALSE}
+colnames(long)
+# Pairwise timepoint comparisons
+just12 <- filter(long, timepoint !=3)
+just13 <- filter(long, timepoint !=2)
+just23 <- filter(long, timepoint !=1)
+```
+
+
+
+## Demographics
+```{r demo, results='asis'}
+### Basic Demographics ###
+tableby( ~ demo_age + demo_sex + demo_gender + demo_race + demo_ethnicity + demo_education, data=wide, digits=1, digits.pct=0, digits.p=3) %>% summary
+
+### Extended Demographics ###
+tableby( ~ demo_edumother + demo_edufather + demo_employment + demo_marital, data=wide, digits=1, digits.pct=0, digits.p=3) %>% summary
+
+### Clinical Information ###
+tableby( ~ demo_dx + demo_med_yn + demo_hospitalizations + demo_insurance + demo_txtype, data=wide, digits=1, digits.pct=0, digits.p=3) %>% summary
+```
+
+
+
+
+## Defeatist Beliefs Scale
+- note biggest shifts are in "If you cannot do something well, there is a little point in doing it at all." and "If I fail partly, it is bad as being a complete failure." Which correspond to the main targeted defeatist beliefs.
+
+### Describe by timepoint
+Note: Higher is better
+```{r, results='asis'}
+tableby( timepoint ~ dbs_respect + dbs_admire + dbs_inferior + dbs_nopoint + dbs_failure + dbs_total, data=long, digits=1, digits.pct=0, digits.p=3) %>% summary
+```
+### Effect sizes (cohen's d)
+```{r, echo=FALSE}
+### Setting up a dataframe to report Cohen's D's
+tb.dbs <- matrix(nrow = 6, ncol = 3) %>% as.data.frame()
+rownames(tb.dbs) <- c("dbs_respect", "dbs_admire", "dbs_inferior", "dbs_nopoint", "dbs_failure", "dbs_total")
+colnames(tb.dbs) <- c("T1 to T2", "T2 to T3", "T1 to T3")
+      
+### Time 1 vs. time 2
+for (i in c("dbs_respect", "dbs_admire", "dbs_inferior", "dbs_nopoint", "dbs_failure", "dbs_total")) {
+      d <- cohen.d(just12[[i]] ~ just12$timepoint)$estimate
+      tb.dbs[i,1] <- round( d*(-1), digits=2 )
+}
+
+### Time 2 vs. time 3
+for (i in c("dbs_respect", "dbs_admire", "dbs_inferior", "dbs_nopoint", "dbs_failure", "dbs_total")) {
+      d <- cohen.d(just23[[i]] ~ just23$timepoint)$estimate
+      tb.dbs[i,2] <- round( d*(-1), digits=2 )
+}
+
+### Time 1 vs. time 3
+for (i in c("dbs_respect", "dbs_admire", "dbs_inferior", "dbs_nopoint", "dbs_failure", "dbs_total")) {
+      d <- cohen.d(just13[[i]] ~ just13$timepoint)$estimate
+      tb.dbs[i,3] <- round( d*(-1), digits=2 )
+}
+
+print(tb.dbs)
+
+```
+
+
+
+## Beck Self Esteem Scale
+### Describe by timepoint
+Note: Lower is better
+```{r, results='asis'}
+tableby( timepoint ~ bses_successful + bses_attractive + bses_popular + bses_independent + bses_honest + bses_desire + bses_strong + bses_smart + bses_power + bses_lovable + bses_pleasant + bses_efficient + bses_responsible + bses_generous + bses_worthwhile + bses_interesting + bses_knowledge + bses_good + bses_total, data=long, digits=1, digits.pct=0, digits.p=3) %>% summary
+```
+### Effect sizes (cohen's d)
+```{r, echo=FALSE}
+### Setting up a dataframe to report Cohen's D's
+tb.bses <- matrix(nrow = 19, ncol = 3) %>% as.data.frame()
+vars_bses <- c("bses_successful", "bses_attractive", "bses_popular", "bses_independent", "bses_honest", "bses_desire", "bses_strong", "bses_smart", "bses_power", "bses_lovable", "bses_pleasant", "bses_efficient", "bses_responsible", "bses_generous", "bses_worthwhile", "bses_interesting", "bses_knowledge", "bses_good", "bses_total")
+rownames(tb.bses) <- vars_bses
+colnames(tb.bses) <- c("T1 to T2", "T2 to T3", "T1 to T3")
+      
+### Time 1 vs. time 2
+for (i in vars_bses) {
+      d <- cohen.d(just12[[i]] ~ just12$timepoint)$estimate
+      tb.bses[i,1] <- round( d*(-1), digits=2 )
+}
+
+### Time 2 vs. time 3
+for (i in vars_bses) {
+      d <- cohen.d(just23[[i]] ~ just23$timepoint)$estimate
+      tb.bses[i,2] <- round( d*(-1), digits=2 )
+}
+
+### Time 1 vs. time 3
+for (i in vars_bses) {
+      d <- cohen.d(just13[[i]] ~ just13$timepoint)$estimate
+      tb.bses[i,3] <- round( d*(-1), digits=2 )
+}
+
+print(tb.bses)
+
+```
+
+
+## AIM/FIM
+### Describe by timepoint
+```{r, results='asis'}
+tableby( timepoint ~ aim_approval + aim_appealing + aim_like + aim_welcome + aim_mean + fim_implementable + fim_possible + fim_doable + fim_easy + fim_mean, data=long, digits=1, digits.pct=0, digits.p=3) %>% summary
+```
+### Effect sizes
+```{r}
+### Setting up a dataframe to report Cohen's D's
+tb.aim <- matrix(nrow = 10, ncol = 1) %>% as.data.frame()
+vars_aim <- c("aim_approval", "aim_appealing", "aim_like", "aim_welcome", "aim_mean", "fim_implementable", "fim_possible", "fim_doable", "fim_easy", "fim_mean")
+rownames(tb.aim) <- vars_aim
+colnames(tb.aim) <- c("T2 to T3")
+      
+### Time 1 vs. time 2
+for (i in vars_aim) {
+      d <- cohen.d(just23[[i]] ~ just23$timepoint)$estimate
+      tb.aim[i,1] <- round( d*(-1), digits=2 )
+}
+
+print(tb.aim)
+```
+
+## Attitudes toward goal
+### Describe by timepoint
+```{r, results='asis'}
+tableby( timepoint ~ nstatt_intenteasy + nstatt_intentimp + nstatt_intentmean + nstatt_confidenteasy + nstatt_confidentimp + nstatt_confidentmean + nstatt_progresseasy + nstatt_progressimp + nstatt_progressany, data=long, digits=1, digits.pct=0, digits.p=3) %>% summary
+```
+### Effect sizes
+```{r}
+### Setting up a dataframe to report Cohen's D's
+tb.att <- matrix(nrow = 6, ncol = 1) %>% as.data.frame()
+vars_att <- c("nstatt_intenteasy", "nstatt_intentimp", "nstatt_intentmean", "nstatt_confidenteasy", "nstatt_confidentimp", "nstatt_confidentmean")
+rownames(tb.att) <- vars_att
+colnames(tb.att) <- c("T1 to T2")
+      
+### Time 1 vs. time 2
+for (i in vars_att) {
+      d <- cohen.d(just12[[i]] ~ just12$timepoint)$estimate
+      tb.att[i,1] <- round( d*(-1), digits=2 )
+}
+
+print(tb.att)
+```
+
+
+
+
